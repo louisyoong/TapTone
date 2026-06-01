@@ -1,7 +1,11 @@
+import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const ColorAssistApp());
@@ -22,7 +26,6 @@ class ColorAssistApp extends StatelessWidget {
         ),
         scaffoldBackgroundColor: const Color(0xFFF7FAF9),
         textTheme: const TextTheme(
-          titleLarge: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
           titleMedium: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           bodyMedium: TextStyle(fontSize: 16, height: 1.35),
           labelLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
@@ -53,50 +56,221 @@ class ColorAssistApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const ColorAssistScreen(),
+      home: const OnboardingGate(),
     );
   }
 }
 
-class ColorAssistScreen extends StatefulWidget {
-  const ColorAssistScreen({super.key});
+class OnboardingGate extends StatefulWidget {
+  const OnboardingGate({super.key});
+
+  static const completedPreferenceKey = 'onboarding_completed';
 
   @override
-  State<ColorAssistScreen> createState() => _ColorAssistScreenState();
+  State<OnboardingGate> createState() => _OnboardingGateState();
 }
 
-class _ColorAssistScreenState extends State<ColorAssistScreen> {
-  final ImagePicker _picker = ImagePicker();
-  XFile? _selectedImage;
-  AssistFilter? _activeFilter;
+class _OnboardingGateState extends State<OnboardingGate> {
+  bool? _hasCompletedOnboarding;
 
-  Future<void> _pickImage(ImageSource source) async {
-    final image = await _picker.pickImage(
-      source: source,
-      imageQuality: 95,
-      maxWidth: 2400,
+  @override
+  void initState() {
+    super.initState();
+    _loadPreference();
+  }
+
+  Future<void> _loadPreference() async {
+    final preferences = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _hasCompletedOnboarding =
+          preferences.getBool(OnboardingGate.completedPreferenceKey) ?? false;
+    });
+  }
+
+  Future<void> _finishOnboarding() async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool(OnboardingGate.completedPreferenceKey, true);
+    if (!mounted) return;
+    setState(() => _hasCompletedOnboarding = true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (_hasCompletedOnboarding) {
+      true => const TapToneShell(),
+      false => OnboardingScreen(onFinished: _finishOnboarding),
+      null => const _StartupScreen(),
+    };
+  }
+}
+
+class _StartupScreen extends StatelessWidget {
+  const _StartupScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: Image(
+          image: AssetImage('assets/images/app_logo.png'),
+          width: 104,
+          height: 104,
+        ),
+      ),
     );
-
-    if (image == null || !mounted) {
-      return;
-    }
-
-    setState(() {
-      _selectedImage = image;
-      _activeFilter = null;
-    });
   }
+}
 
-  void _selectFilter(AssistFilter filter) {
-    setState(() {
-      _activeFilter = filter;
-    });
+class OnboardingScreen extends StatelessWidget {
+  const OnboardingScreen({super.key, required this.onFinished});
+
+  final Future<void> Function() onFinished;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(28),
+                        child: Image.asset(
+                          'assets/images/app_logo.png',
+                          width: 132,
+                          height: 132,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        'TapTone',
+                        style: theme.textTheme.headlineLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF123C38),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Helping colorblind users distinguish colors better.',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: const Color(0xFF41524E),
+                          height: 1.35,
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+                      const _OnboardingFeature(
+                        icon: Icons.auto_fix_high_rounded,
+                        title: 'Enhance color differences',
+                        text:
+                            'Apply assistive filters to photos when colors are difficult to tell apart.',
+                      ),
+                      const SizedBox(height: 14),
+                      const _OnboardingFeature(
+                        icon: Icons.colorize_rounded,
+                        title: 'Identify colors around you',
+                        text:
+                            'Use the camera to check a color name and its hex code in real time.',
+                      ),
+                      const SizedBox(height: 14),
+                      const _OnboardingFeature(
+                        icon: Icons.visibility_rounded,
+                        title: 'Understand color vision',
+                        text:
+                            'Preview simulations that show how color vision differences can appear.',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              FilledButton.icon(
+                onPressed: onFinished,
+                icon: const Icon(Icons.arrow_forward_rounded),
+                label: const Text('Get Started'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
+}
 
-  void _resetFilter() {
-    setState(() {
-      _activeFilter = null;
-    });
+class _OnboardingFeature extends StatelessWidget {
+  const _OnboardingFeature({
+    required this.icon,
+    required this.title,
+    required this.text,
+  });
+
+  final IconData icon;
+  final String title;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(11),
+            child: Icon(icon, color: theme.colorScheme.onPrimaryContainer),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: theme.textTheme.titleMedium),
+              const SizedBox(height: 3),
+              Text(
+                text,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: const Color(0xFF52615E),
+                  fontSize: 15,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class TapToneShell extends StatefulWidget {
+  const TapToneShell({super.key});
+
+  @override
+  State<TapToneShell> createState() => _TapToneShellState();
+}
+
+class _TapToneShellState extends State<TapToneShell> {
+  int _selectedIndex = 0;
+
+  Widget _currentPage() {
+    return switch (_selectedIndex) {
+      1 => const ColorDetectorScreen(),
+      2 => const SimulationScreen(),
+      _ => const ColorAssistScreen(),
+    };
   }
 
   @override
@@ -125,35 +299,331 @@ class _ColorAssistScreenState extends State<ColorAssistScreen> {
         backgroundColor: theme.colorScheme.surface,
         foregroundColor: theme.colorScheme.onSurface,
       ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
-          children: [
-            Text(
-              'Helping colorblind users distinguish colors better.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: const Color(0xFF41524E),
+      body: SafeArea(child: _currentPage()),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: (index) =>
+            setState(() => _selectedIndex = index),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.auto_fix_high_outlined),
+            selectedIcon: Icon(Icons.auto_fix_high_rounded),
+            label: 'Assist',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.colorize_outlined),
+            selectedIcon: Icon(Icons.colorize_rounded),
+            label: 'Detect',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.visibility_outlined),
+            selectedIcon: Icon(Icons.visibility_rounded),
+            label: 'Simulate',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ColorAssistScreen extends StatefulWidget {
+  const ColorAssistScreen({super.key});
+
+  @override
+  State<ColorAssistScreen> createState() => _ColorAssistScreenState();
+}
+
+class _ColorAssistScreenState extends State<ColorAssistScreen> {
+  final ImagePicker _picker = ImagePicker();
+  XFile? _selectedImage;
+  AssistFilter? _activeFilter;
+
+  Future<void> _pickImage(ImageSource source) async {
+    final image = await _picker.pickImage(
+      source: source,
+      imageQuality: 95,
+      maxWidth: 2400,
+    );
+    if (image == null || !mounted) return;
+    setState(() {
+      _selectedImage = image;
+      _activeFilter = null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Column(
+        children: [
+          Text(
+            'Helping colorblind users distinguish colors better.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: const Color(0xFF41524E),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: Center(
+              child: _PhotoPreview(
+                image: _selectedImage,
+                label: _activeFilter?.title ?? 'Original',
+                matrix: _activeFilter?.matrix,
               ),
-              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 18),
-            _ImagePreview(image: _selectedImage, filter: _activeFilter),
-            const SizedBox(height: 16),
-            _ImageActions(
-              onTakePhoto: () => _pickImage(ImageSource.camera),
-              onUploadPhoto: () => _pickImage(ImageSource.gallery),
-            ),
-            const SizedBox(height: 22),
-            Text('Filters', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 12),
-            _FilterScroller(
+          ),
+          const SizedBox(height: 10),
+          _ImageActions(
+            onTakePhoto: () => _pickImage(ImageSource.camera),
+            onUploadPhoto: () => _pickImage(ImageSource.gallery),
+          ),
+          const SizedBox(height: 14),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text('Assist filters', style: theme.textTheme.titleMedium),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 136,
+            child: _PhotoFilterScroller(
               image: _selectedImage,
-              activeFilter: _activeFilter,
-              onFilterSelected: _selectFilter,
-              onReset: _resetFilter,
+              activeTitle: _activeFilter?.title,
+              options: AssistFilter.values
+                  .map((filter) => _FilterOption(filter.title, filter.matrix))
+                  .toList(),
+              onSelect: (title) =>
+                  setState(() => _activeFilter = AssistFilter.byTitle(title)),
+              onReset: () => setState(() => _activeFilter = null),
             ),
-            const SizedBox(height: 18),
-            _DisclaimerCard(theme: theme),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ColorDetectorScreen extends StatefulWidget {
+  const ColorDetectorScreen({super.key});
+
+  @override
+  State<ColorDetectorScreen> createState() => _ColorDetectorScreenState();
+}
+
+class _ColorDetectorScreenState extends State<ColorDetectorScreen>
+    with WidgetsBindingObserver {
+  CameraController? _controller;
+  String? _error;
+  DetectedColor _detected = DetectedColor.fromColor(const Color(0xFFFFFFFF));
+  DateTime _lastSample = DateTime.fromMillisecondsSinceEpoch(0);
+  bool _processingFrame = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _startCamera();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
+      _disposeCamera();
+    } else if (state == AppLifecycleState.resumed && _controller == null) {
+      _startCamera();
+    }
+  }
+
+  Future<void> _startCamera() async {
+    try {
+      final cameras = await availableCameras();
+      if (cameras.isEmpty) {
+        throw CameraException('noCamera', 'No camera found.');
+      }
+      final controller = CameraController(
+        cameras.firstWhere(
+          (camera) => camera.lensDirection == CameraLensDirection.back,
+          orElse: () => cameras.first,
+        ),
+        ResolutionPreset.medium,
+        enableAudio: false,
+        imageFormatGroup: Platform.isIOS
+            ? ImageFormatGroup.bgra8888
+            : ImageFormatGroup.yuv420,
+      );
+      await controller.initialize();
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+      setState(() => _controller = controller);
+      await controller.startImageStream(_processFrame);
+    } on CameraException catch (error) {
+      if (mounted) {
+        setState(() => _error = error.description ?? 'Camera unavailable.');
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _error =
+              'Camera unavailable. Check camera permission and try again.',
+        );
+      }
+    }
+  }
+
+  void _processFrame(CameraImage image) {
+    final now = DateTime.now();
+    if (_processingFrame || now.difference(_lastSample).inMilliseconds < 250) {
+      return;
+    }
+    _processingFrame = true;
+    _lastSample = now;
+    try {
+      final color = _sampleCenterColor(image);
+      if (mounted) setState(() => _detected = DetectedColor.fromColor(color));
+    } finally {
+      _processingFrame = false;
+    }
+  }
+
+  Color _sampleCenterColor(CameraImage image) {
+    const radius = 12;
+    const step = 4;
+    final centerX = image.width ~/ 2;
+    final centerY = image.height ~/ 2;
+    var red = 0;
+    var green = 0;
+    var blue = 0;
+    var samples = 0;
+
+    for (var offsetY = -radius; offsetY <= radius; offsetY += step) {
+      for (var offsetX = -radius; offsetX <= radius; offsetX += step) {
+        final x = (centerX + offsetX).clamp(0, image.width - 1);
+        final y = (centerY + offsetY).clamp(0, image.height - 1);
+        final color = image.planes.length == 1
+            ? _readBgraPixel(image, x, y)
+            : _readYuvPixel(image, x, y);
+        if (color == null) continue;
+        final argb = color.toARGB32();
+        red += (argb >> 16) & 0xFF;
+        green += (argb >> 8) & 0xFF;
+        blue += argb & 0xFF;
+        samples++;
+      }
+    }
+
+    if (samples == 0) return Colors.white;
+    return Color.fromARGB(
+      255,
+      red ~/ samples,
+      green ~/ samples,
+      blue ~/ samples,
+    );
+  }
+
+  Color? _readBgraPixel(CameraImage image, int x, int y) {
+    final plane = image.planes.first;
+    final index = y * plane.bytesPerRow + x * 4;
+    if (index + 2 >= plane.bytes.length) return null;
+    return Color.fromARGB(
+      255,
+      plane.bytes[index + 2],
+      plane.bytes[index + 1],
+      plane.bytes[index],
+    );
+  }
+
+  Color? _readYuvPixel(CameraImage image, int x, int y) {
+    final yPlane = image.planes[0];
+    final uPlane = image.planes[1];
+    final vPlane = image.planes[2];
+    final uvPixelStride = uPlane.bytesPerPixel ?? 1;
+    final uvIndex = (y ~/ 2) * uPlane.bytesPerRow + (x ~/ 2) * uvPixelStride;
+    final yIndex = y * yPlane.bytesPerRow + x;
+    if (yIndex >= yPlane.bytes.length ||
+        uvIndex >= uPlane.bytes.length ||
+        uvIndex >= vPlane.bytes.length) {
+      return null;
+    }
+    final luminance = yPlane.bytes[yIndex].toDouble();
+    final u = uPlane.bytes[uvIndex].toDouble() - 128;
+    final v = vPlane.bytes[uvIndex].toDouble() - 128;
+    return Color.fromARGB(
+      255,
+      (luminance + 1.402 * v).round().clamp(0, 255),
+      (luminance - 0.344136 * u - 0.714136 * v).round().clamp(0, 255),
+      (luminance + 1.772 * u).round().clamp(0, 255),
+    );
+  }
+
+  Future<void> _disposeCamera() async {
+    final controller = _controller;
+    _controller = null;
+    if (controller == null) return;
+    if (controller.value.isStreamingImages) await controller.stopImageStream();
+    await controller.dispose();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    unawaited(_disposeCamera());
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = _controller;
+    if (_error != null) {
+      return _CameraMessage(icon: Icons.no_photography_outlined, text: _error!);
+    }
+    if (controller == null || !controller.value.isInitialized) {
+      return const _CameraMessage(
+        icon: Icons.photo_camera_outlined,
+        text: 'Starting camera...',
+      );
+    }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        CameraPreview(controller),
+        const Center(child: _CameraTarget()),
+        Positioned(
+          left: 18,
+          right: 18,
+          bottom: 18,
+          child: _DetectedColorPanel(detected: _detected),
+        ),
+      ],
+    );
+  }
+}
+
+class _CameraMessage extends StatelessWidget {
+  const _CameraMessage({required this.icon, required this.text});
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 54, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(height: 14),
+            Text(
+              text,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
           ],
         ),
       ),
@@ -161,45 +631,347 @@ class _ColorAssistScreenState extends State<ColorAssistScreen> {
   }
 }
 
-class _ImagePreview extends StatelessWidget {
-  const _ImagePreview({required this.image, required this.filter});
+class _CameraTarget extends StatelessWidget {
+  const _CameraTarget();
 
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 82,
+      height: 82,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 3),
+              boxShadow: const [
+                BoxShadow(color: Colors.black45, blurRadius: 8),
+              ],
+            ),
+          ),
+          Container(
+            width: 14,
+            height: 14,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.black45, width: 2),
+            ),
+          ),
+          const Positioned(
+            right: 0,
+            top: 0,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                shape: BoxShape.circle,
+              ),
+              child: Padding(
+                padding: EdgeInsets.all(7),
+                child: Icon(
+                  Icons.colorize_rounded,
+                  color: Colors.white,
+                  size: 19,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetectedColorPanel extends StatelessWidget {
+  const _DetectedColorPanel({required this.detected});
+  final DetectedColor detected;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.76),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                color: detected.color,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white70),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    detected.name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    detected.hex,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class SimulationScreen extends StatefulWidget {
+  const SimulationScreen({super.key});
+
+  @override
+  State<SimulationScreen> createState() => _SimulationScreenState();
+}
+
+class _SimulationScreenState extends State<SimulationScreen>
+    with WidgetsBindingObserver {
+  CameraController? _controller;
+  SimulationFilter? _activeFilter;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _startCamera();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
+      _disposeCamera();
+    } else if (state == AppLifecycleState.resumed && _controller == null) {
+      _startCamera();
+    }
+  }
+
+  Future<void> _startCamera() async {
+    try {
+      final cameras = await availableCameras();
+      if (cameras.isEmpty) {
+        throw CameraException('noCamera', 'No camera found.');
+      }
+      final controller = CameraController(
+        cameras.firstWhere(
+          (camera) => camera.lensDirection == CameraLensDirection.back,
+          orElse: () => cameras.first,
+        ),
+        ResolutionPreset.high,
+        enableAudio: false,
+      );
+      await controller.initialize();
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+      setState(() => _controller = controller);
+    } on CameraException catch (error) {
+      if (mounted) {
+        setState(() => _error = error.description ?? 'Camera unavailable.');
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _error =
+              'Camera unavailable. Check camera permission and try again.',
+        );
+      }
+    }
+  }
+
+  Future<void> _disposeCamera() async {
+    final controller = _controller;
+    _controller = null;
+    await controller?.dispose();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    unawaited(_disposeCamera());
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = _controller;
+    if (_error != null) {
+      return _CameraMessage(icon: Icons.no_photography_outlined, text: _error!);
+    }
+    if (controller == null || !controller.value.isInitialized) {
+      return const _CameraMessage(
+        icon: Icons.photo_camera_outlined,
+        text: 'Starting camera...',
+      );
+    }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ColorFiltered(
+          colorFilter: ColorFilter.matrix(
+            _activeFilter?.matrix ?? AssistFilter.identityMatrix,
+          ),
+          child: CameraPreview(controller),
+        ),
+        Positioned(
+          top: 14,
+          left: 14,
+          child: _PreviewLabel(text: _activeFilter?.title ?? 'Normal vision'),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 14,
+          child: _LiveSimulationFilters(
+            activeFilter: _activeFilter,
+            onReset: () => setState(() => _activeFilter = null),
+            onSelect: (filter) => setState(() => _activeFilter = filter),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LiveSimulationFilters extends StatelessWidget {
+  const _LiveSimulationFilters({
+    required this.activeFilter,
+    required this.onReset,
+    required this.onSelect,
+  });
+
+  final SimulationFilter? activeFilter;
+  final VoidCallback onReset;
+  final ValueChanged<SimulationFilter> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Row(
+            children: [
+              _LiveFilterButton(
+                title: 'Normal',
+                isSelected: activeFilter == null,
+                onTap: onReset,
+              ),
+              ...SimulationFilter.values.map(
+                (filter) => _LiveFilterButton(
+                  title: filter.title,
+                  isSelected: activeFilter == filter,
+                  onTap: () => onSelect(filter),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LiveFilterButton extends StatelessWidget {
+  const _LiveFilterButton({
+    required this.title,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String title;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            title,
+            style: TextStyle(
+              color: isSelected ? const Color(0xFF123C38) : Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PhotoPreview extends StatelessWidget {
+  const _PhotoPreview({required this.image, required this.label, this.matrix});
   final XFile? image;
-  final AssistFilter? filter;
+  final String label;
+  final List<double>? matrix;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final label = filter?.title ?? 'Normal Vision Reference';
-
     return Card(
       clipBehavior: Clip.antiAlias,
       child: AspectRatio(
         aspectRatio: 1,
         child: image == null
             ? DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.86),
-                  gradient: const LinearGradient(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [Color(0xFFFFFFFF), Color(0xFFF0F6F4)],
                   ),
                 ),
                 child: Center(
-                  child: Container(
-                    width: 92,
-                    height: 92,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.72),
-                      borderRadius: BorderRadius.circular(26),
-                      border: Border.all(color: const Color(0xFFDDE8E5)),
-                    ),
-                    child: Icon(
-                      Icons.image_search_rounded,
-                      size: 42,
-                      color: theme.colorScheme.primary.withValues(alpha: 0.56),
-                    ),
+                  child: Icon(
+                    Icons.image_search_rounded,
+                    size: 54,
+                    color: theme.colorScheme.primary.withValues(alpha: 0.56),
                   ),
                 ),
               )
@@ -208,33 +980,14 @@ class _ImagePreview extends StatelessWidget {
                 children: [
                   ColorFiltered(
                     colorFilter: ColorFilter.matrix(
-                      filter?.matrix ?? AssistFilter.identityMatrix,
+                      matrix ?? AssistFilter.identityMatrix,
                     ),
                     child: Image.file(File(image!.path), fit: BoxFit.cover),
                   ),
                   Positioned(
                     left: 12,
                     top: 12,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.68),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 8,
-                        ),
-                        child: Text(
-                          label,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ),
+                    child: _PreviewLabel(text: label),
                   ),
                 ],
               ),
@@ -243,60 +996,73 @@ class _ImagePreview extends StatelessWidget {
   }
 }
 
+class _PreviewLabel extends StatelessWidget {
+  const _PreviewLabel({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.68),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 14,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ImageActions extends StatelessWidget {
   const _ImageActions({required this.onTakePhoto, required this.onUploadPhoto});
-
   final VoidCallback onTakePhoto;
   final VoidCallback onUploadPhoto;
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWide = constraints.maxWidth >= 430;
-        final buttons = [
-          FilledButton.icon(
+    return Row(
+      children: [
+        Expanded(
+          child: FilledButton.icon(
             onPressed: onTakePhoto,
             icon: const Icon(Icons.photo_camera_rounded),
             label: const Text('Take Photo'),
           ),
-          OutlinedButton.icon(
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: OutlinedButton.icon(
             onPressed: onUploadPhoto,
             icon: const Icon(Icons.photo_library_rounded),
             label: const Text('Upload Photo'),
           ),
-        ];
-
-        if (isWide) {
-          return Row(
-            children: [
-              Expanded(child: buttons.first),
-              const SizedBox(width: 12),
-              Expanded(child: buttons.last),
-            ],
-          );
-        }
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [buttons.first, const SizedBox(height: 10), buttons.last],
-        );
-      },
+        ),
+      ],
     );
   }
 }
 
-class _FilterScroller extends StatelessWidget {
-  const _FilterScroller({
+class _PhotoFilterScroller extends StatelessWidget {
+  const _PhotoFilterScroller({
     required this.image,
-    required this.activeFilter,
-    required this.onFilterSelected,
+    required this.activeTitle,
+    required this.options,
+    required this.onSelect,
     required this.onReset,
   });
-
   final XFile? image;
-  final AssistFilter? activeFilter;
-  final ValueChanged<AssistFilter> onFilterSelected;
+  final String? activeTitle;
+  final List<_FilterOption> options;
+  final ValueChanged<String> onSelect;
   final VoidCallback onReset;
 
   @override
@@ -306,30 +1072,27 @@ class _FilterScroller extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         children: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: _FilterTile(
-              title: 'Reset',
-              image: image,
-              matrix: AssistFilter.identityMatrix,
-              isSelected: activeFilter == null,
-              selectedIcon: Icons.refresh_rounded,
-              onTap: onReset,
+          _FilterTile(
+            title: 'Reset',
+            image: image,
+            matrix: AssistFilter.identityMatrix,
+            isSelected: activeTitle == null,
+            selectedIcon: Icons.refresh_rounded,
+            onTap: onReset,
+          ),
+          ...options.map(
+            (option) => Padding(
+              padding: const EdgeInsets.only(left: 12),
+              child: _FilterTile(
+                title: option.title,
+                image: image,
+                matrix: option.matrix,
+                isSelected: option.title == activeTitle,
+                selectedIcon: Icons.check_rounded,
+                onTap: () => onSelect(option.title),
+              ),
             ),
           ),
-          ...AssistFilter.values.map((filter) {
-            return Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: _FilterTile(
-                title: filter.title,
-                image: image,
-                matrix: filter.matrix,
-                isSelected: filter == activeFilter,
-                selectedIcon: Icons.check_rounded,
-                onTap: () => onFilterSelected(filter),
-              ),
-            );
-          }),
         ],
       ),
     );
@@ -345,7 +1108,6 @@ class _FilterTile extends StatelessWidget {
     required this.selectedIcon,
     required this.onTap,
   });
-
   final String title;
   final XFile? image;
   final List<double> matrix;
@@ -356,10 +1118,6 @@ class _FilterTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final borderColor = isSelected
-        ? theme.colorScheme.primary
-        : const Color(0xFFE2EAE7);
-
     return Semantics(
       button: true,
       selected: isSelected,
@@ -379,20 +1137,11 @@ class _FilterTile extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(
-                    color: borderColor,
+                    color: isSelected
+                        ? theme.colorScheme.primary
+                        : const Color(0xFFE2EAE7),
                     width: isSelected ? 3 : 1,
                   ),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: theme.colorScheme.primary.withValues(
-                              alpha: 0.16,
-                            ),
-                            blurRadius: 14,
-                            offset: const Offset(0, 6),
-                          ),
-                        ]
-                      : null,
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(15),
@@ -439,31 +1188,55 @@ class _FilterTile extends StatelessWidget {
   }
 }
 
-class _DisclaimerCard extends StatelessWidget {
-  const _DisclaimerCard({required this.theme});
+class _FilterOption {
+  const _FilterOption(this.title, this.matrix);
+  final String title;
+  final List<double> matrix;
+}
 
-  final ThemeData theme;
+class DetectedColor {
+  const DetectedColor(this.name, this.hex, this.color);
+  final String name;
+  final String hex;
+  final Color color;
 
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFFBEB),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFF4E5A7)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Text(
-          'This app helps enhance color differences, but cannot restore normal color vision or guarantee exact real-world colors.',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: const Color(0xFF5D4A12),
-            fontSize: 14,
-          ),
-        ),
-      ),
+  factory DetectedColor.fromColor(Color color) {
+    final nearest = _namedColors.reduce(
+      (best, current) =>
+          _distance(color, current.color) < _distance(color, best.color)
+          ? current
+          : best,
     );
+    final rgb = color.toARGB32() & 0xFFFFFF;
+    final hex = '#${rgb.toRadixString(16).padLeft(6, '0')}'.toUpperCase();
+    return DetectedColor(nearest.name, hex, color);
   }
+
+  static double _distance(Color a, Color b) =>
+      math.pow(a.r - b.r, 2).toDouble() +
+      math.pow(a.g - b.g, 2).toDouble() +
+      math.pow(a.b - b.b, 2).toDouble();
+
+  static const _namedColors = [
+    _NamedColor('Black', Color(0xFF111111)),
+    _NamedColor('White', Color(0xFFF5F5F5)),
+    _NamedColor('Gray', Color(0xFF808080)),
+    _NamedColor('Red', Color(0xFFE53935)),
+    _NamedColor('Orange', Color(0xFFFB8C00)),
+    _NamedColor('Yellow', Color(0xFFFDD835)),
+    _NamedColor('Green', Color(0xFF43A047)),
+    _NamedColor('Teal', Color(0xFF00897B)),
+    _NamedColor('Blue', Color(0xFF1E88E5)),
+    _NamedColor('Purple', Color(0xFF8E24AA)),
+    _NamedColor('Pink', Color(0xFFD81B60)),
+    _NamedColor('Brown', Color(0xFF795548)),
+  ];
+}
+
+class _NamedColor {
+  const _NamedColor(this.name, this.color);
+  final String name;
+  final Color color;
 }
 
 enum AssistFilter {
@@ -534,10 +1307,12 @@ enum AssistFilter {
     0,
   ]);
 
-  // Daltonization-style matrices: remap color differences that may be lost
-  // into channels that are more likely to remain distinguishable.
   const AssistFilter(this.title, this.matrix);
+  final String title;
+  final List<double> matrix;
 
+  static AssistFilter byTitle(String title) =>
+      values.firstWhere((filter) => filter.title == title);
   static const identityMatrix = <double>[
     1,
     0,
@@ -560,7 +1335,79 @@ enum AssistFilter {
     1,
     0,
   ];
+}
 
+enum SimulationFilter {
+  deuteranomaly('Deuteranomaly', <double>[
+    0.80,
+    0.20,
+    0,
+    0,
+    0,
+    0.258,
+    0.742,
+    0,
+    0,
+    0,
+    0,
+    0.142,
+    0.858,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+  ]),
+  protanopia('Protanopia', <double>[
+    0.567,
+    0.433,
+    0,
+    0,
+    0,
+    0.558,
+    0.442,
+    0,
+    0,
+    0,
+    0,
+    0.242,
+    0.758,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+  ]),
+  tritanopia('Tritanopia', <double>[
+    0.95,
+    0.05,
+    0,
+    0,
+    0,
+    0,
+    0.433,
+    0.567,
+    0,
+    0,
+    0,
+    0.475,
+    0.525,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+  ]);
+
+  const SimulationFilter(this.title, this.matrix);
   final String title;
   final List<double> matrix;
+  static SimulationFilter byTitle(String title) =>
+      values.firstWhere((filter) => filter.title == title);
 }
