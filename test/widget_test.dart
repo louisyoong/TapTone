@@ -1,3 +1,4 @@
+import 'package:taptone/app_strings.dart';
 import 'package:taptone/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,6 +7,21 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   test('formats detected colors with their full RGB hex value', () {
     expect(DetectedColor.fromColor(const Color(0xFFE53935)).hex, '#E53935');
+  });
+
+  test('detects practical detailed color names', () {
+    expect(DetectedColor.fromColor(const Color(0xFF000080)).name, 'Navy');
+    expect(DetectedColor.fromColor(const Color(0xFF42A5F5)).name, 'Sky Blue');
+    expect(DetectedColor.fromColor(const Color(0xFF00897B)).name, 'Teal');
+    expect(DetectedColor.fromColor(const Color(0xFFFFC107)).name, 'Gold');
+  });
+
+  test('supports added app languages and migrates old Chinese preference', () {
+    expect(AppLanguage.fromCode('zh'), AppLanguage.simplifiedChinese);
+    expect(AppLanguage.fromCode('zh_TW'), AppLanguage.traditionalChinese);
+    expect(AppStrings(AppLanguage.thai).t('language'), 'ภาษา');
+    expect(AppStrings(AppLanguage.hindi).t('language'), 'भाषा');
+    expect(AppStrings(AppLanguage.arabic).t('language'), 'اللغة');
   });
 
   testWidgets('shows onboarding once and remembers completion', (tester) async {
@@ -91,13 +107,16 @@ void main() {
 
     await tester.tap(find.text('English'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('中文').last);
+    await tester.tap(find.text('中文（简体）').last);
     await tester.pumpAndSettle();
 
     expect(find.text('设置'), findsOneWidget);
     expect(find.text('隐私政策'), findsOneWidget);
     expect(find.text('应用版本'), findsOneWidget);
     final preferences = await SharedPreferences.getInstance();
-    expect(preferences.getString(ColorAssistApp.languagePreferenceKey), 'zh');
+    expect(
+      preferences.getString(ColorAssistApp.languagePreferenceKey),
+      'zh_CN',
+    );
   });
 }
