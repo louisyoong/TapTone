@@ -14,6 +14,7 @@ TapTone is an assistive mobile app for iOS and Android. It provides photo filter
 
 - [Privacy Policy](privacy-policy/)
 - [Support](support/)
+- [Terms of Use](terms-of-use/)
 
 ## Contact
 

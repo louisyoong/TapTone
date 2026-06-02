@@ -16,4 +16,4 @@ TapTone is an assistive tool, not a medical device. It helps enhance color diffe
 
 ## Privacy
 
-Read the [TapTone Privacy Policy](../privacy-policy/).
+Read the [TapTone Privacy Policy](../privacy-policy/) and [Terms of Use](../terms-of-use/).

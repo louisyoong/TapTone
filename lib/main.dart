@@ -5,59 +5,136 @@ import 'dart:math' as math;
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 void main() {
   runApp(const ColorAssistApp());
 }
 
-class ColorAssistApp extends StatelessWidget {
+class ColorAssistApp extends StatefulWidget {
   const ColorAssistApp({super.key});
+
+  static const themeModePreferenceKey = 'dark_mode_enabled';
+
+  @override
+  State<ColorAssistApp> createState() => _ColorAssistAppState();
+}
+
+class _ColorAssistAppState extends State<ColorAssistApp> {
+  ThemeMode _themeMode = ThemeMode.light;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadThemeMode();
+  }
+
+  Future<void> _loadThemeMode() async {
+    final preferences = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _themeMode =
+          preferences.getBool(ColorAssistApp.themeModePreferenceKey) ?? false
+          ? ThemeMode.dark
+          : ThemeMode.light;
+    });
+  }
+
+  Future<void> _setDarkMode(bool enabled) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool(ColorAssistApp.themeModePreferenceKey, enabled);
+    if (!mounted) return;
+    setState(() => _themeMode = enabled ? ThemeMode.dark : ThemeMode.light);
+  }
+
+  ThemeData _theme(Brightness brightness) {
+    final isDark = brightness == Brightness.dark;
+    return ThemeData(
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: const Color(0xFF126A63),
+        brightness: brightness,
+      ),
+      scaffoldBackgroundColor: isDark
+          ? const Color(0xFF111817)
+          : const Color(0xFFF7FAF9),
+      textTheme: const TextTheme(
+        titleMedium: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        bodyMedium: TextStyle(fontSize: 16, height: 1.35),
+        labelLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(0, 52),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(0, 52),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      ),
+      cardTheme: CardThemeData(
+        elevation: 0,
+        color: isDark ? const Color(0xFF1B2624) : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(
+            color: isDark ? const Color(0xFF33433F) : const Color(0xFFE2EAE7),
+          ),
+        ),
+      ),
+      navigationBarTheme: const NavigationBarThemeData(
+        height: 68,
+        labelTextStyle: WidgetStatePropertyAll(
+          TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+        ),
+      ),
+      useMaterial3: true,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'TapTone',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF126A63),
-          brightness: Brightness.light,
-        ),
-        scaffoldBackgroundColor: const Color(0xFFF7FAF9),
-        textTheme: const TextTheme(
-          titleMedium: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-          bodyMedium: TextStyle(fontSize: 16, height: 1.35),
-          labelLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-        ),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            minimumSize: const Size(0, 52),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-          ),
-        ),
-        outlinedButtonTheme: OutlinedButtonThemeData(
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size(0, 52),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-          ),
-        ),
-        cardTheme: CardThemeData(
-          elevation: 0,
-          color: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-            side: const BorderSide(color: Color(0xFFE2EAE7)),
-          ),
-        ),
-        useMaterial3: true,
+      theme: _theme(Brightness.light),
+      darkTheme: _theme(Brightness.dark),
+      themeMode: _themeMode,
+      home: ThemeSettingsScope(
+        darkModeEnabled: _themeMode == ThemeMode.dark,
+        onDarkModeChanged: _setDarkMode,
+        child: const OnboardingGate(),
       ),
-      home: const OnboardingGate(),
     );
+  }
+}
+
+class ThemeSettingsScope extends InheritedWidget {
+  const ThemeSettingsScope({
+    super.key,
+    required this.darkModeEnabled,
+    required this.onDarkModeChanged,
+    required super.child,
+  });
+
+  final bool darkModeEnabled;
+  final ValueChanged<bool> onDarkModeChanged;
+
+  static ThemeSettingsScope of(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<ThemeSettingsScope>()!;
+  }
+
+  @override
+  bool updateShouldNotify(ThemeSettingsScope oldWidget) {
+    return darkModeEnabled != oldWidget.darkModeEnabled;
   }
 }
 
@@ -163,7 +240,7 @@ class OnboardingScreen extends StatelessWidget {
                         'Helping colorblind users distinguish colors better.',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.titleMedium?.copyWith(
-                          color: const Color(0xFF41524E),
+                          color: theme.colorScheme.onSurfaceVariant,
                           height: 1.35,
                         ),
                       ),
@@ -269,6 +346,7 @@ class _TapToneShellState extends State<TapToneShell> {
     return switch (_selectedIndex) {
       1 => const ColorDetectorScreen(),
       2 => const SimulationScreen(),
+      3 => const SettingsScreen(),
       _ => const ColorAssistScreen(),
     };
   }
@@ -306,22 +384,145 @@ class _TapToneShellState extends State<TapToneShell> {
             setState(() => _selectedIndex = index),
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.auto_fix_high_outlined),
-            selectedIcon: Icon(Icons.auto_fix_high_rounded),
+            icon: Icon(Icons.auto_fix_high_outlined, size: 22),
+            selectedIcon: Icon(Icons.auto_fix_high_rounded, size: 22),
             label: 'Assist',
           ),
           NavigationDestination(
-            icon: Icon(Icons.colorize_outlined),
-            selectedIcon: Icon(Icons.colorize_rounded),
+            icon: Icon(Icons.colorize_outlined, size: 22),
+            selectedIcon: Icon(Icons.colorize_rounded, size: 22),
             label: 'Detect',
           ),
           NavigationDestination(
-            icon: Icon(Icons.visibility_outlined),
-            selectedIcon: Icon(Icons.visibility_rounded),
+            icon: Icon(Icons.visibility_outlined, size: 22),
+            selectedIcon: Icon(Icons.visibility_rounded, size: 22),
             label: 'Simulate',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined, size: 22),
+            selectedIcon: Icon(Icons.settings_rounded, size: 22),
+            label: 'Settings',
           ),
         ],
       ),
+    );
+  }
+}
+
+class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  static final _privacyPolicyUrl = Uri.parse(
+    'https://louisyoong.github.io/TapTone/privacy-policy/',
+  );
+  static final _termsOfUseUrl = Uri.parse(
+    'https://louisyoong.github.io/TapTone/terms-of-use/',
+  );
+
+  String _version = 'Loading...';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      setState(
+        () => _version = '${packageInfo.version} (${packageInfo.buildNumber})',
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _version = '1.0.0 (1)');
+    }
+  }
+
+  Future<void> _openUrl(Uri url) async {
+    if (await launchUrl(url, mode: LaunchMode.externalApplication)) return;
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Unable to open the link. Please try again.'),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final themeSettings = ThemeSettingsScope.of(context);
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      children: [
+        Text('Appearance', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        Card(
+          child: SwitchListTile(
+            value: themeSettings.darkModeEnabled,
+            onChanged: themeSettings.onDarkModeChanged,
+            secondary: Icon(
+              themeSettings.darkModeEnabled
+                  ? Icons.dark_mode_rounded
+                  : Icons.light_mode_rounded,
+            ),
+            title: const Text('Dark mode'),
+            subtitle: Text(
+              themeSettings.darkModeEnabled
+                  ? 'Dark theme enabled'
+                  : 'Light theme enabled',
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+        Text('Legal', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        Card(
+          child: Column(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.privacy_tip_outlined),
+                title: const Text('Privacy Policy'),
+                trailing: const Icon(Icons.open_in_new_rounded),
+                onTap: () => _openUrl(_privacyPolicyUrl),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.description_outlined),
+                title: const Text('Terms of Use'),
+                trailing: const Icon(Icons.open_in_new_rounded),
+                onTap: () => _openUrl(_termsOfUseUrl),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        Text('About', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        Card(
+          child: Column(
+            children: [
+              const ListTile(
+                leading: Icon(Icons.apps_rounded),
+                title: Text('App Name'),
+                trailing: Text('TapTone'),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.info_outline_rounded),
+                title: const Text('App Version'),
+                trailing: Text(_version),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -637,14 +838,12 @@ class _CameraTarget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 82,
-      height: 82,
+      width: 58,
+      height: 58,
       child: Stack(
         alignment: Alignment.center,
         children: [
           Container(
-            width: 58,
-            height: 58,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white, width: 3),
@@ -660,24 +859,6 @@ class _CameraTarget extends StatelessWidget {
               color: Colors.white,
               shape: BoxShape.circle,
               border: Border.all(color: Colors.black45, width: 2),
-            ),
-          ),
-          const Positioned(
-            right: 0,
-            top: 0,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                shape: BoxShape.circle,
-              ),
-              child: Padding(
-                padding: EdgeInsets.all(7),
-                child: Icon(
-                  Icons.colorize_rounded,
-                  color: Colors.white,
-                  size: 19,
-                ),
-              ),
             ),
           ),
         ],

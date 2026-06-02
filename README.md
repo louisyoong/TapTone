@@ -13,6 +13,7 @@ TapTone is a Flutter app that helps colorblind users distinguish colors better.
 
 - [Privacy Policy](https://louisyoong.github.io/TapTone/privacy-policy/)
 - [Support](https://louisyoong.github.io/TapTone/support/)
+- [Terms of Use](https://louisyoong.github.io/TapTone/terms-of-use/)
 - Contact: [louis91work@gmail.com](mailto:louis91work@gmail.com)
 
 ## Disclaimer
