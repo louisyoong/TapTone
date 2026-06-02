@@ -4,10 +4,13 @@ import 'dart:math' as math;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import 'app_strings.dart';
 
 void main() {
   runApp(const ColorAssistApp());
@@ -17,6 +20,7 @@ class ColorAssistApp extends StatefulWidget {
   const ColorAssistApp({super.key});
 
   static const themeModePreferenceKey = 'dark_mode_enabled';
+  static const languagePreferenceKey = 'app_language';
 
   @override
   State<ColorAssistApp> createState() => _ColorAssistAppState();
@@ -24,6 +28,7 @@ class ColorAssistApp extends StatefulWidget {
 
 class _ColorAssistAppState extends State<ColorAssistApp> {
   ThemeMode _themeMode = ThemeMode.light;
+  AppLanguage _language = AppLanguage.english;
 
   @override
   void initState() {
@@ -39,6 +44,9 @@ class _ColorAssistAppState extends State<ColorAssistApp> {
           preferences.getBool(ColorAssistApp.themeModePreferenceKey) ?? false
           ? ThemeMode.dark
           : ThemeMode.light;
+      _language = AppLanguage.fromCode(
+        preferences.getString(ColorAssistApp.languagePreferenceKey),
+      );
     });
   }
 
@@ -47,6 +55,16 @@ class _ColorAssistAppState extends State<ColorAssistApp> {
     await preferences.setBool(ColorAssistApp.themeModePreferenceKey, enabled);
     if (!mounted) return;
     setState(() => _themeMode = enabled ? ThemeMode.dark : ThemeMode.light);
+  }
+
+  Future<void> _setLanguage(AppLanguage language) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(
+      ColorAssistApp.languagePreferenceKey,
+      language.code,
+    );
+    if (!mounted) return;
+    setState(() => _language = language);
   }
 
   ThemeData _theme(Brightness brightness) {
@@ -108,9 +126,14 @@ class _ColorAssistAppState extends State<ColorAssistApp> {
       theme: _theme(Brightness.light),
       darkTheme: _theme(Brightness.dark),
       themeMode: _themeMode,
+      locale: _language.locale,
+      supportedLocales: AppLanguage.values.map((language) => language.locale),
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       home: ThemeSettingsScope(
         darkModeEnabled: _themeMode == ThemeMode.dark,
         onDarkModeChanged: _setDarkMode,
+        language: _language,
+        onLanguageChanged: _setLanguage,
         child: const OnboardingGate(),
       ),
     );
@@ -122,11 +145,17 @@ class ThemeSettingsScope extends InheritedWidget {
     super.key,
     required this.darkModeEnabled,
     required this.onDarkModeChanged,
+    required this.language,
+    required this.onLanguageChanged,
     required super.child,
   });
 
   final bool darkModeEnabled;
   final ValueChanged<bool> onDarkModeChanged;
+  final AppLanguage language;
+  final ValueChanged<AppLanguage> onLanguageChanged;
+
+  AppStrings get strings => AppStrings(language);
 
   static ThemeSettingsScope of(BuildContext context) {
     return context.dependOnInheritedWidgetOfExactType<ThemeSettingsScope>()!;
@@ -134,7 +163,8 @@ class ThemeSettingsScope extends InheritedWidget {
 
   @override
   bool updateShouldNotify(ThemeSettingsScope oldWidget) {
-    return darkModeEnabled != oldWidget.darkModeEnabled;
+    return darkModeEnabled != oldWidget.darkModeEnabled ||
+        language != oldWidget.language;
   }
 }
 
@@ -207,6 +237,7 @@ class OnboardingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final strings = ThemeSettingsScope.of(context).strings;
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -237,7 +268,7 @@ class OnboardingScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Helping colorblind users distinguish colors better.',
+                        strings.t('tagline'),
                         textAlign: TextAlign.center,
                         style: theme.textTheme.titleMedium?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
@@ -245,25 +276,22 @@ class OnboardingScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 30),
-                      const _OnboardingFeature(
+                      _OnboardingFeature(
                         icon: Icons.auto_fix_high_rounded,
-                        title: 'Enhance color differences',
-                        text:
-                            'Apply assistive filters to photos when colors are difficult to tell apart.',
+                        title: strings.t('onboarding.enhance.title'),
+                        text: strings.t('onboarding.enhance.text'),
                       ),
                       const SizedBox(height: 14),
-                      const _OnboardingFeature(
+                      _OnboardingFeature(
                         icon: Icons.colorize_rounded,
-                        title: 'Identify colors around you',
-                        text:
-                            'Use the camera to check a color name and its hex code in real time.',
+                        title: strings.t('onboarding.identify.title'),
+                        text: strings.t('onboarding.identify.text'),
                       ),
                       const SizedBox(height: 14),
-                      const _OnboardingFeature(
+                      _OnboardingFeature(
                         icon: Icons.visibility_rounded,
-                        title: 'Understand color vision',
-                        text:
-                            'Preview simulations that show how color vision differences can appear.',
+                        title: strings.t('onboarding.understand.title'),
+                        text: strings.t('onboarding.understand.text'),
                       ),
                     ],
                   ),
@@ -273,7 +301,7 @@ class OnboardingScreen extends StatelessWidget {
               FilledButton.icon(
                 onPressed: onFinished,
                 icon: const Icon(Icons.arrow_forward_rounded),
-                label: const Text('Get Started'),
+                label: Text(strings.t('getStarted')),
               ),
             ],
           ),
@@ -354,6 +382,7 @@ class _TapToneShellState extends State<TapToneShell> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final strings = ThemeSettingsScope.of(context).strings;
 
     return Scaffold(
       appBar: AppBar(
@@ -382,26 +411,26 @@ class _TapToneShellState extends State<TapToneShell> {
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) =>
             setState(() => _selectedIndex = index),
-        destinations: const [
+        destinations: [
           NavigationDestination(
             icon: Icon(Icons.auto_fix_high_outlined, size: 22),
             selectedIcon: Icon(Icons.auto_fix_high_rounded, size: 22),
-            label: 'Assist',
+            label: strings.t('tab.assist'),
           ),
           NavigationDestination(
             icon: Icon(Icons.colorize_outlined, size: 22),
             selectedIcon: Icon(Icons.colorize_rounded, size: 22),
-            label: 'Detect',
+            label: strings.t('tab.detect'),
           ),
           NavigationDestination(
             icon: Icon(Icons.visibility_outlined, size: 22),
             selectedIcon: Icon(Icons.visibility_rounded, size: 22),
-            label: 'Simulate',
+            label: strings.t('tab.simulate'),
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined, size: 22),
             selectedIcon: Icon(Icons.settings_rounded, size: 22),
-            label: 'Settings',
+            label: strings.t('tab.settings'),
           ),
         ],
       ),
@@ -449,8 +478,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (await launchUrl(url, mode: LaunchMode.externalApplication)) return;
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Unable to open the link. Please try again.'),
+      SnackBar(
+        content: Text(ThemeSettingsScope.of(context).strings.t('linkError')),
       ),
     );
   }
@@ -458,10 +487,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final themeSettings = ThemeSettingsScope.of(context);
+    final strings = themeSettings.strings;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
-        Text('Appearance', style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          strings.t('appearance'),
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         const SizedBox(height: 8),
         Card(
           child: SwitchListTile(
@@ -472,30 +505,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ? Icons.dark_mode_rounded
                   : Icons.light_mode_rounded,
             ),
-            title: const Text('Dark mode'),
+            title: Text(strings.t('darkMode')),
             subtitle: Text(
               themeSettings.darkModeEnabled
-                  ? 'Dark theme enabled'
-                  : 'Light theme enabled',
+                  ? strings.t('darkEnabled')
+                  : strings.t('lightEnabled'),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.language_rounded),
+            title: Text(strings.t('language')),
+            trailing: DropdownButton<AppLanguage>(
+              value: themeSettings.language,
+              underline: const SizedBox.shrink(),
+              alignment: Alignment.centerRight,
+              selectedItemBuilder: (context) => AppLanguage.values
+                  .map(
+                    (language) => Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(language.label),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (language) {
+                if (language != null) themeSettings.onLanguageChanged(language);
+              },
+              items: AppLanguage.values
+                  .map(
+                    (language) => DropdownMenuItem(
+                      value: language,
+                      child: Text(language.label),
+                    ),
+                  )
+                  .toList(),
             ),
           ),
         ),
         const SizedBox(height: 18),
-        Text('Legal', style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          strings.t('legal'),
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         const SizedBox(height: 8),
         Card(
           child: Column(
             children: [
               ListTile(
                 leading: const Icon(Icons.privacy_tip_outlined),
-                title: const Text('Privacy Policy'),
+                title: Text(strings.t('privacyPolicy')),
                 trailing: const Icon(Icons.open_in_new_rounded),
                 onTap: () => _openUrl(_privacyPolicyUrl),
               ),
               const Divider(height: 1),
               ListTile(
                 leading: const Icon(Icons.description_outlined),
-                title: const Text('Terms of Use'),
+                title: Text(strings.t('termsOfUse')),
                 trailing: const Icon(Icons.open_in_new_rounded),
                 onTap: () => _openUrl(_termsOfUseUrl),
               ),
@@ -503,20 +570,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         const SizedBox(height: 18),
-        Text('About', style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          strings.t('about'),
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         const SizedBox(height: 8),
         Card(
           child: Column(
             children: [
-              const ListTile(
-                leading: Icon(Icons.apps_rounded),
-                title: Text('App Name'),
-                trailing: Text('TapTone'),
+              ListTile(
+                leading: const Icon(Icons.apps_rounded),
+                title: Text(strings.t('appName')),
+                trailing: const Text('TapTone'),
               ),
               const Divider(height: 1),
               ListTile(
                 leading: const Icon(Icons.info_outline_rounded),
-                title: const Text('App Version'),
+                title: Text(strings.t('appVersion')),
                 trailing: Text(_version),
               ),
             ],
@@ -555,12 +625,13 @@ class _ColorAssistScreenState extends State<ColorAssistScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final strings = ThemeSettingsScope.of(context).strings;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Column(
         children: [
           Text(
-            'Helping colorblind users distinguish colors better.',
+            strings.t('tagline'),
             style: theme.textTheme.bodyMedium?.copyWith(
               color: const Color(0xFF41524E),
             ),
@@ -571,7 +642,7 @@ class _ColorAssistScreenState extends State<ColorAssistScreen> {
             child: Center(
               child: _PhotoPreview(
                 image: _selectedImage,
-                label: _activeFilter?.title ?? 'Original',
+                label: _activeFilter?.title ?? strings.t('original'),
                 matrix: _activeFilter?.matrix,
               ),
             ),
@@ -584,7 +655,10 @@ class _ColorAssistScreenState extends State<ColorAssistScreen> {
           const SizedBox(height: 14),
           Align(
             alignment: Alignment.centerLeft,
-            child: Text('Assist filters', style: theme.textTheme.titleMedium),
+            child: Text(
+              strings.t('assistFilters'),
+              style: theme.textTheme.titleMedium,
+            ),
           ),
           const SizedBox(height: 8),
           SizedBox(
@@ -778,14 +852,18 @@ class _ColorDetectorScreenState extends State<ColorDetectorScreen>
 
   @override
   Widget build(BuildContext context) {
+    final strings = ThemeSettingsScope.of(context).strings;
     final controller = _controller;
     if (_error != null) {
-      return _CameraMessage(icon: Icons.no_photography_outlined, text: _error!);
+      return _CameraMessage(
+        icon: Icons.no_photography_outlined,
+        text: strings.t('cameraUnavailable'),
+      );
     }
     if (controller == null || !controller.value.isInitialized) {
-      return const _CameraMessage(
+      return _CameraMessage(
         icon: Icons.photo_camera_outlined,
-        text: 'Starting camera...',
+        text: strings.t('startingCamera'),
       );
     }
 
@@ -873,6 +951,7 @@ class _DetectedColorPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = ThemeSettingsScope.of(context).strings;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.76),
@@ -897,7 +976,7 @@ class _DetectedColorPanel extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    detected.name,
+                    strings.colorName(detected.name),
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 20,
@@ -1002,14 +1081,18 @@ class _SimulationScreenState extends State<SimulationScreen>
 
   @override
   Widget build(BuildContext context) {
+    final strings = ThemeSettingsScope.of(context).strings;
     final controller = _controller;
     if (_error != null) {
-      return _CameraMessage(icon: Icons.no_photography_outlined, text: _error!);
+      return _CameraMessage(
+        icon: Icons.no_photography_outlined,
+        text: strings.t('cameraUnavailable'),
+      );
     }
     if (controller == null || !controller.value.isInitialized) {
-      return const _CameraMessage(
+      return _CameraMessage(
         icon: Icons.photo_camera_outlined,
-        text: 'Starting camera...',
+        text: strings.t('startingCamera'),
       );
     }
 
@@ -1055,6 +1138,7 @@ class _LiveSimulationFilters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = ThemeSettingsScope.of(context).strings;
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -1068,7 +1152,7 @@ class _LiveSimulationFilters extends StatelessWidget {
           child: Row(
             children: [
               _LiveFilterButton(
-                title: 'Normal',
+                title: strings.t('normal'),
                 isSelected: activeFilter == null,
                 onTap: onReset,
               ),
@@ -1210,13 +1294,14 @@ class _ImageActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = ThemeSettingsScope.of(context).strings;
     return Row(
       children: [
         Expanded(
           child: FilledButton.icon(
             onPressed: onTakePhoto,
             icon: const Icon(Icons.photo_camera_rounded),
-            label: const Text('Take Photo'),
+            label: Text(strings.t('takePhoto')),
           ),
         ),
         const SizedBox(width: 10),
@@ -1224,7 +1309,7 @@ class _ImageActions extends StatelessWidget {
           child: OutlinedButton.icon(
             onPressed: onUploadPhoto,
             icon: const Icon(Icons.photo_library_rounded),
-            label: const Text('Upload Photo'),
+            label: Text(strings.t('uploadPhoto')),
           ),
         ),
       ],
@@ -1248,13 +1333,14 @@ class _PhotoFilterScroller extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = ThemeSettingsScope.of(context).strings;
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         children: [
           _FilterTile(
-            title: 'Reset',
+            title: strings.t('reset'),
             image: image,
             matrix: AssistFilter.identityMatrix,
             isSelected: activeTitle == null,

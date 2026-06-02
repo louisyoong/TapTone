@@ -78,4 +78,26 @@ void main() {
     final preferences = await SharedPreferences.getInstance();
     expect(preferences.getBool(ColorAssistApp.themeModePreferenceKey), isTrue);
   });
+
+  testWidgets('changes and persists the selected app language', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      OnboardingGate.completedPreferenceKey: true,
+    });
+
+    await tester.pumpWidget(const ColorAssistApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('English'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('中文').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('设置'), findsOneWidget);
+    expect(find.text('隐私政策'), findsOneWidget);
+    expect(find.text('应用版本'), findsOneWidget);
+    final preferences = await SharedPreferences.getInstance();
+    expect(preferences.getString(ColorAssistApp.languagePreferenceKey), 'zh');
+  });
 }

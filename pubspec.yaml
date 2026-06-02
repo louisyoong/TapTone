@@ -39,6 +39,8 @@ dependencies:
   shared_preferences: ^2.5.5
   url_launcher: ^6.3.2
   package_info_plus: ^9.0.1
+  flutter_localizations:
+    sdk: flutter
 
 dev_dependencies:
   flutter_test:
