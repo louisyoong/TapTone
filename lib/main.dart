@@ -6,11 +6,14 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:liquid_glass_bar/liquid_glass_bar.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'app_strings.dart';
+import 'color_test.dart';
+import 'liquid_glass_nav_bar.dart';
 
 void main() {
   runApp(const ColorAssistApp());
@@ -374,7 +377,8 @@ class _TapToneShellState extends State<TapToneShell> {
     return switch (_selectedIndex) {
       1 => const ColorDetectorScreen(),
       2 => const SimulationScreen(),
-      3 => const SettingsScreen(),
+      3 => const ColorTestScreen(),
+      4 => const SettingsScreen(),
       _ => const ColorAssistScreen(),
     };
   }
@@ -383,6 +387,7 @@ class _TapToneShellState extends State<TapToneShell> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final strings = ThemeSettingsScope.of(context).strings;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
@@ -407,29 +412,40 @@ class _TapToneShellState extends State<TapToneShell> {
         foregroundColor: theme.colorScheme.onSurface,
       ),
       body: SafeArea(child: _currentPage()),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) =>
-            setState(() => _selectedIndex = index),
-        destinations: [
-          NavigationDestination(
-            icon: Icon(Icons.auto_fix_high_outlined, size: 22),
-            selectedIcon: Icon(Icons.auto_fix_high_rounded, size: 22),
+      bottomNavigationBar: LiquidGlassNavBar(
+        currentIndex: _selectedIndex,
+        onTap: (index) => setState(() => _selectedIndex = index),
+        isDark: isDark,
+        style: LiquidGlassBarStyle(
+          activeColor: theme.colorScheme.primary,
+          inactiveColor: theme.colorScheme.onSurfaceVariant,
+          liquidGlassSettings: LiquidGlassSettings(
+            thickness: 20,
+            blur: 16,
+            glassColor: isDark ? const Color(0xF00E1513) : const Color(0xCCFFFFFF),
+            lightIntensity: 0.6,
+            refractiveIndex: 1.5,
+          ),
+        ),
+        items: [
+          LiquidGlassBarItem(
+            iconData: Icons.auto_fix_high_rounded,
             label: strings.t('tab.assist'),
           ),
-          NavigationDestination(
-            icon: Icon(Icons.colorize_outlined, size: 22),
-            selectedIcon: Icon(Icons.colorize_rounded, size: 22),
+          LiquidGlassBarItem(
+            iconData: Icons.colorize_rounded,
             label: strings.t('tab.detect'),
           ),
-          NavigationDestination(
-            icon: Icon(Icons.visibility_outlined, size: 22),
-            selectedIcon: Icon(Icons.visibility_rounded, size: 22),
+          LiquidGlassBarItem(
+            iconData: Icons.visibility_rounded,
             label: strings.t('tab.simulate'),
           ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined, size: 22),
-            selectedIcon: Icon(Icons.settings_rounded, size: 22),
+          LiquidGlassBarItem(
+            iconData: Icons.quiz_rounded,
+            label: strings.t('tab.colorTest'),
+          ),
+          LiquidGlassBarItem(
+            iconData: Icons.settings_rounded,
             label: strings.t('tab.settings'),
           ),
         ],
