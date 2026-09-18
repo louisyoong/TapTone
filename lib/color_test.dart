@@ -377,99 +377,131 @@ class _QuizView extends StatelessWidget {
     final theme = Theme.of(context);
     final strings = ThemeSettingsScope.of(context).strings;
     final canSubmit = cantSee || controller.text.trim().isNotEmpty;
+    final keyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(value: index / total, minHeight: 8),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text('${index + 1}/$total', style: theme.textTheme.labelLarge),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Expanded(
-            child: Center(
-              child: FutureBuilder<List<_Dot>>(
-                future: dotsFuture,
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const CircularProgressIndicator();
-                  }
-                  return Card(
-                    clipBehavior: Clip.antiAlias,
-                    child: Padding(
-                      padding: const EdgeInsets.all(10),
-                      child: CustomPaint(
-                        size: const Size(_plateSize, _plateSize),
-                        painter: _IshiharaPainter(snapshot.data!),
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final plateSize = math.min(
+              constraints.maxWidth - 20,
+              keyboardVisible ? 160.0 : 300.0,
+            );
+            return SingleChildScrollView(
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(999),
+                          child: LinearProgressIndicator(value: index / total, minHeight: 8),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text('${index + 1}/$total', style: theme.textTheme.labelLarge),
+                    ],
+                  ),
+                  SizedBox(height: keyboardVisible ? 10 : 18),
+                  Center(
+                    child: SizedBox(
+                      width: plateSize,
+                      height: plateSize,
+                      child: FutureBuilder<List<_Dot>>(
+                        future: dotsFuture,
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) {
+                            return const Center(child: CircularProgressIndicator());
+                          }
+                          return Card(
+                            clipBehavior: Clip.antiAlias,
+                            margin: EdgeInsets.zero,
+                            child: Padding(
+                              padding: const EdgeInsets.all(10),
+                              child: FittedBox(
+                                child: SizedBox(
+                                  width: _plateSize,
+                                  height: _plateSize,
+                                  child: CustomPaint(
+                                    painter: _IshiharaPainter(snapshot.data!),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
-                  );
-                },
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(strings.t('colorTest.prompt'), style: theme.textTheme.titleMedium),
-          const SizedBox(height: 10),
-          TextField(
-            controller: controller,
-            enabled: !cantSee,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            textAlign: TextAlign.center,
-            style: theme.textTheme.headlineSmall,
-            decoration: InputDecoration(
-              hintText: strings.t('colorTest.inputHint'),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-            ),
-          ),
-          const SizedBox(height: 4),
-          InkWell(
-            onTap: () => onCantSeeChanged(!cantSee),
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: Checkbox(
-                      value: cantSee,
-                      onChanged: (value) => onCantSeeChanged(value ?? false),
-                      visualDensity: VisualDensity.compact,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  SizedBox(height: keyboardVisible ? 10 : 16),
+                  Text(strings.t('colorTest.prompt'), style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: controller,
+                    enabled: !cantSee,
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.done,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.headlineSmall,
+                    onSubmitted: (_) => FocusScope.of(context).unfocus(),
+                    decoration: InputDecoration(
+                      hintText: strings.t('colorTest.inputHint'),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                      suffixIcon: keyboardVisible
+                          ? IconButton(
+                              icon: const Icon(Icons.keyboard_hide_rounded),
+                              tooltip: strings.t('colorTest.hideKeyboard'),
+                              onPressed: () => FocusScope.of(context).unfocus(),
+                            )
+                          : null,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Text(strings.t('colorTest.cantSee'), style: theme.textTheme.bodySmall),
+                  const SizedBox(height: 4),
+                  InkWell(
+                    onTap: () => onCantSeeChanged(!cantSee),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: Checkbox(
+                              value: cantSee,
+                              onChanged: (value) => onCantSeeChanged(value ?? false),
+                              visualDensity: VisualDensity.compact,
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(strings.t('colorTest.cantSee'), style: theme.textTheme.bodySmall),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: canSubmit ? onSubmit : null,
+                      child: Text(
+                        index == total - 1
+                            ? strings.t('colorTest.finish')
+                            : strings.t('colorTest.next'),
+                      ),
+                    ),
+                  ),
                 ],
               ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: canSubmit ? onSubmit : null,
-              child: Text(
-                index == total - 1
-                    ? strings.t('colorTest.finish')
-                    : strings.t('colorTest.next'),
-              ),
-            ),
-          ),
-        ],
+            );
+          },
+        ),
       ),
     );
   }
