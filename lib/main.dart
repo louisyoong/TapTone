@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
@@ -1495,12 +1494,21 @@ class DetectedColor {
     return DetectedColor(nearest.name, hex, color);
   }
 
-  static double _distance(Color a, Color b) =>
-      math.pow(a.r - b.r, 2).toDouble() +
-      math.pow(a.g - b.g, 2).toDouble() +
-      math.pow(a.b - b.b, 2).toDouble();
+  // "Redmean" weighted RGB distance: a cheap approximation of perceptual
+  // color difference that outperforms plain Euclidean RGB distance,
+  // which matters once the palette below gets this dense.
+  static double _distance(Color a, Color b) {
+    final r1 = a.r * 255, g1 = a.g * 255, b1 = a.b * 255;
+    final r2 = b.r * 255, g2 = b.g * 255, b2 = b.b * 255;
+    final rMean = (r1 + r2) / 2;
+    final dr = r1 - r2, dg = g1 - g2, db = b1 - b2;
+    return (2 + rMean / 256) * dr * dr +
+        4 * dg * dg +
+        (2 + (255 - rMean) / 256) * db * db;
+  }
 
   static const _namedColors = [
+    // Core everyday names.
     _NamedColor('Black', Color(0xFF111111)),
     _NamedColor('Charcoal', Color(0xFF37474F)),
     _NamedColor('Gray', Color(0xFF808080)),
@@ -1529,6 +1537,122 @@ class DetectedColor {
     _NamedColor('Pink', Color(0xFFF48FB1)),
     _NamedColor('Brown', Color(0xFF795548)),
     _NamedColor('Beige', Color(0xFFD7CCC8)),
+    // Extended real-world palette (standard web/X11 color keywords) for
+    // much finer-grained detection.
+    _NamedColor('Alice Blue', Color(0xFFF0F8FF)),
+    _NamedColor('Antique White', Color(0xFFFAEBD7)),
+    _NamedColor('Aquamarine', Color(0xFF7FFFD4)),
+    _NamedColor('Azure', Color(0xFFF0FFFF)),
+    _NamedColor('Bisque', Color(0xFFFFE4C4)),
+    _NamedColor('Blanched Almond', Color(0xFFFFEBCD)),
+    _NamedColor('Blue Violet', Color(0xFF8A2BE2)),
+    _NamedColor('Burlywood', Color(0xFFDEB887)),
+    _NamedColor('Cadet Blue', Color(0xFF5F9EA0)),
+    _NamedColor('Chartreuse', Color(0xFF7FFF00)),
+    _NamedColor('Chocolate', Color(0xFFD2691E)),
+    _NamedColor('Cornflower Blue', Color(0xFF6495ED)),
+    _NamedColor('Cornsilk', Color(0xFFFFF8DC)),
+    _NamedColor('Crimson', Color(0xFFDC143C)),
+    _NamedColor('Dark Blue', Color(0xFF00008B)),
+    _NamedColor('Dark Cyan', Color(0xFF008B8B)),
+    _NamedColor('Dark Goldenrod', Color(0xFFB8860B)),
+    _NamedColor('Dark Gray', Color(0xFFA9A9A9)),
+    _NamedColor('Dark Green', Color(0xFF006400)),
+    _NamedColor('Dark Khaki', Color(0xFFBDB76B)),
+    _NamedColor('Dark Magenta', Color(0xFF8B008B)),
+    _NamedColor('Dark Olive Green', Color(0xFF556B2F)),
+    _NamedColor('Dark Orange', Color(0xFFFF8C00)),
+    _NamedColor('Dark Orchid', Color(0xFF9932CC)),
+    _NamedColor('Dark Red', Color(0xFF8B0000)),
+    _NamedColor('Dark Salmon', Color(0xFFE9967A)),
+    _NamedColor('Dark Sea Green', Color(0xFF8FBC8F)),
+    _NamedColor('Dark Slate Blue', Color(0xFF483D8B)),
+    _NamedColor('Dark Slate Gray', Color(0xFF2F4F4F)),
+    _NamedColor('Dark Turquoise', Color(0xFF00CED1)),
+    _NamedColor('Dark Violet', Color(0xFF9400D3)),
+    _NamedColor('Deep Pink', Color(0xFFFF1493)),
+    _NamedColor('Deep Sky Blue', Color(0xFF00BFFF)),
+    _NamedColor('Dim Gray', Color(0xFF696969)),
+    _NamedColor('Dodger Blue', Color(0xFF1E90FF)),
+    _NamedColor('Firebrick', Color(0xFFB22222)),
+    _NamedColor('Floral White', Color(0xFFFFFAF0)),
+    _NamedColor('Fuchsia', Color(0xFFFF00FF)),
+    _NamedColor('Gainsboro', Color(0xFFDCDCDC)),
+    _NamedColor('Ghost White', Color(0xFFF8F8FF)),
+    _NamedColor('Goldenrod', Color(0xFFDAA520)),
+    _NamedColor('Green Yellow', Color(0xFFADFF2F)),
+    _NamedColor('Honeydew', Color(0xFFF0FFF0)),
+    _NamedColor('Hot Pink', Color(0xFFFF69B4)),
+    _NamedColor('Indian Red', Color(0xFFCD5C5C)),
+    _NamedColor('Ivory', Color(0xFFFFFFF0)),
+    _NamedColor('Khaki', Color(0xFFF0E68C)),
+    _NamedColor('Lavender Blush', Color(0xFFFFF0F5)),
+    _NamedColor('Lawn Green', Color(0xFF7CFC00)),
+    _NamedColor('Lemon Chiffon', Color(0xFFFFFACD)),
+    _NamedColor('Light Blue', Color(0xFFADD8E6)),
+    _NamedColor('Light Coral', Color(0xFFF08080)),
+    _NamedColor('Light Cyan', Color(0xFFE0FFFF)),
+    _NamedColor('Light Goldenrod Yellow', Color(0xFFFAFAD2)),
+    _NamedColor('Light Gray', Color(0xFFD3D3D3)),
+    _NamedColor('Light Green', Color(0xFF90EE90)),
+    _NamedColor('Light Pink', Color(0xFFFFB6C1)),
+    _NamedColor('Light Salmon', Color(0xFFFFA07A)),
+    _NamedColor('Light Sea Green', Color(0xFF20B2AA)),
+    _NamedColor('Light Sky Blue', Color(0xFF87CEFA)),
+    _NamedColor('Light Slate Gray', Color(0xFF778899)),
+    _NamedColor('Light Steel Blue', Color(0xFFB0C4DE)),
+    _NamedColor('Light Yellow', Color(0xFFFFFFE0)),
+    _NamedColor('Lime Green', Color(0xFF32CD32)),
+    _NamedColor('Linen', Color(0xFFFAF0E6)),
+    _NamedColor('Medium Aquamarine', Color(0xFF66CDAA)),
+    _NamedColor('Medium Blue', Color(0xFF0000CD)),
+    _NamedColor('Medium Orchid', Color(0xFFBA55D3)),
+    _NamedColor('Medium Purple', Color(0xFF9370DB)),
+    _NamedColor('Medium Sea Green', Color(0xFF3CB371)),
+    _NamedColor('Medium Slate Blue', Color(0xFF7B68EE)),
+    _NamedColor('Medium Spring Green', Color(0xFF00FA9A)),
+    _NamedColor('Medium Turquoise', Color(0xFF48D1CC)),
+    _NamedColor('Medium Violet Red', Color(0xFFC71585)),
+    _NamedColor('Midnight Blue', Color(0xFF191970)),
+    _NamedColor('Mint Cream', Color(0xFFF5FFFA)),
+    _NamedColor('Misty Rose', Color(0xFFFFE4E1)),
+    _NamedColor('Moccasin', Color(0xFFFFE4B5)),
+    _NamedColor('Navajo White', Color(0xFFFFDEAD)),
+    _NamedColor('Old Lace', Color(0xFFFDF5E6)),
+    _NamedColor('Olive Drab', Color(0xFF6B8E23)),
+    _NamedColor('Orange Red', Color(0xFFFF4500)),
+    _NamedColor('Orchid', Color(0xFFDA70D6)),
+    _NamedColor('Pale Goldenrod', Color(0xFFEEE8AA)),
+    _NamedColor('Pale Green', Color(0xFF98FB98)),
+    _NamedColor('Pale Turquoise', Color(0xFFAFEEEE)),
+    _NamedColor('Pale Violet Red', Color(0xFFDB7093)),
+    _NamedColor('Papaya Whip', Color(0xFFFFEFD5)),
+    _NamedColor('Peach Puff', Color(0xFFFFDAB9)),
+    _NamedColor('Peru', Color(0xFFCD853F)),
+    _NamedColor('Plum', Color(0xFFDDA0DD)),
+    _NamedColor('Powder Blue', Color(0xFFB0E0E6)),
+    _NamedColor('Rebecca Purple', Color(0xFF663399)),
+    _NamedColor('Rosy Brown', Color(0xFFBC8F8F)),
+    _NamedColor('Royal Blue', Color(0xFF4169E1)),
+    _NamedColor('Saddle Brown', Color(0xFF8B4513)),
+    _NamedColor('Salmon', Color(0xFFFA8072)),
+    _NamedColor('Sandy Brown', Color(0xFFF4A460)),
+    _NamedColor('Sea Green', Color(0xFF2E8B57)),
+    _NamedColor('Seashell', Color(0xFFFFF5EE)),
+    _NamedColor('Sienna', Color(0xFFA0522D)),
+    _NamedColor('Slate Blue', Color(0xFF6A5ACD)),
+    _NamedColor('Slate Gray', Color(0xFF708090)),
+    _NamedColor('Snow', Color(0xFFFFFAFA)),
+    _NamedColor('Spring Green', Color(0xFF00FF7F)),
+    _NamedColor('Steel Blue', Color(0xFF4682B4)),
+    _NamedColor('Tan', Color(0xFFD2B48C)),
+    _NamedColor('Thistle', Color(0xFFD8BFD8)),
+    _NamedColor('Tomato', Color(0xFFFF6347)),
+    _NamedColor('Turquoise', Color(0xFF40E0D0)),
+    _NamedColor('Violet', Color(0xFFEE82EE)),
+    _NamedColor('Wheat', Color(0xFFF5DEB3)),
+    _NamedColor('White Smoke', Color(0xFFF5F5F5)),
+    _NamedColor('Yellow Green', Color(0xFF9ACD32)),
   ];
 }
 
