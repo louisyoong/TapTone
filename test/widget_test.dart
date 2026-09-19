@@ -75,6 +75,10 @@ void main() {
     SharedPreferences.setMockInitialValues({
       OnboardingGate.completedPreferenceKey: true,
     });
+    tester.view.physicalSize = const Size(1179, 2556);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(const ColorAssistApp());
     await tester.pumpAndSettle();
@@ -99,6 +103,10 @@ void main() {
     SharedPreferences.setMockInitialValues({
       OnboardingGate.completedPreferenceKey: true,
     });
+    tester.view.physicalSize = const Size(1179, 2556);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(const ColorAssistApp());
     await tester.pumpAndSettle();
